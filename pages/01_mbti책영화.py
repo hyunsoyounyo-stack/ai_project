@@ -160,7 +160,3 @@ if selected_mbti:
             st.warning(data["movie_1"])
         with col2:
             st.warning(data["movie_2"])
-
-# 6. 푸터 메시지
-st.markdown("---")
-st.caption("🎈 기본 파이썬 라이브러리로 빌드되어 가볍고 빠르게 작동하는 앱입니다. 스트림릿 클라우드에서 바로 즐겨보세요!")
