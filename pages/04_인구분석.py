@@ -76,3 +76,55 @@ try:
 except Exception as e:
     st.error(f"데이터를 불러오거나 처리하는 중 오류가 발생했습니다: {e}")
     st.info("`population.csv` 파일이 `app.py`와 같은 폴더에 있는지 확인해 주세요.")
+    # ------------------------------------------------------------------
+# 4. 추가 기능: 연령대별 인구수가 가장 많은 행정구역 분석 (기존 코드 밑에 추가)
+# ------------------------------------------------------------------
+st.divider()  # 화면 구분을 위한 선
+st.header("✨ 추가 기능: 연령대별 인구 우수 자치구 분석")
+st.markdown("특정 연령대를 선택하면, 해당 연령대의 인구수가 가장 많은 자치구 순으로 그래프를 보여줍니다.")
+
+# 연령대 선택 셀렉트박스
+selected_age = st.selectbox("분석할 연령대를 선택하세요:", age_cols)
+
+if selected_age:
+    # '서울특별시 (1100000000)' 등 전체 합계 행은 제외하고 자치구만 추출
+    # 보통 구별 데이터는 구 이름이 포함되어 있으므로 조건 필터링
+    df_districts = df[df["행정구역"].str.contains("구 \(")]
+    
+    # 선택한 연령대 인구수 기준으로 내림차순 정렬 (상위 10개 구 추출)
+    top_districts = df_districts.sort_values(by=selected_age, ascending=False).head(10)
+    
+    # 그래프에 깔끔하게 표시하기 위해 '서울특별시 강서구 (1150000000)' -> '강서구' 형태로 가공
+    x_labels = top_districts["행정구역"].str.split().str[1]
+    y_values_age = top_districts[selected_age].values
+
+    # 그래프 그리기
+    fig2, ax2 = plt.subplots(figsize=(10, 5))
+    
+    # 디자인 조건 반영: 바탕은 연한 회색(#F0F2F6), 꺾은선은 라일락 색상(#C8A2C8)
+    ax2.set_facecolor("#F0F2F6")
+    fig2.patch.set_facecolor("#F0F2F6")
+    
+    # 꺾은선 그래프 그리기
+    ax2.plot(x_labels, y_values_age, marker='s', linestyle='-', color='#C8A2C8', linewidth=2.5, markersize=7)
+    
+    # 그래프 상세 설정
+    ax2.set_title(f"[{selected_age}] 인구수 상위 10개 자치구", fontsize=14, fontweight='bold', pad=15)
+    ax2.set_xlabel("행정구역 (자치구)", fontsize=11, labelpad=10)
+    ax2.set_ylabel("인구수 (명)", fontsize=11, labelpad=10)
+    ax2.grid(True, linestyle='--', alpha=0.5, color='white')
+    
+    # 천 단위 쉼표 포맷팅
+    ax2.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
+    
+    # 스트림릿 앱에 출력
+    st.pyplot(fig2)
+    
+    # 순위 데이터 테이블 표시
+    with st.expander(f"{selected_age} 인구 순위 Top 10 상세 보기"):
+        rank_df = pd.DataFrame({
+            "순위": range(1, 11),
+            "자치구": x_labels,
+            "인구수(명)": y_values_age
+        }).set_index("순위")
+        st.dataframe(rank_df.style.format({"인구수(명)": "{:,}"}), use_container_width=True)
