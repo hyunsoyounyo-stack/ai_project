@@ -11,8 +11,8 @@ st.write("1907년부터의 서울 기온 데이터를 조회하고 그래프로 
 # 2. 데이터 로드 및 전처리 (캐싱 처리로 속도 향상)
 @st.cache_data
 def load_data():
-    # 데이터 읽기
-    df = pd.read_csv("seoul.csv")
+    # ⭐ [수정] 한글 인코딩 오류 해결을 위해 encoding='cp949' 추가
+    df = pd.read_csv("seoul.csv", encoding="cp949")
     
     # 칼럼명 공백 제거
     df.columns = df.columns.str.strip()
@@ -74,7 +74,7 @@ try:
         ax.set_xlabel("Date (날짜)", fontsize=11)
         ax.set_ylabel("Temperature (기온, ℃)", fontsize=11)
         
-        # 날짜 포맷팅 (데이터 양에 따라 보기 좋게 조절)
+        # 날짜 포맷팅
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         fig.autofmt_xdate() # 날짜 겹침 방지 회전
         
@@ -86,10 +86,9 @@ try:
         # 스트림릿에 그래프 출력
         st.pyplot(fig)
         
-        # 데이터 테이블 보여주기 (선택 사항)
+        # 데이터 테이블 보여주기
         with st.expander("📄 선택한 기간의 상세 데이터 보기"):
             st.dataframe(filtered_df[['날짜', '평균기온(℃)', '최저기온(℃)', '최고기온(℃)']], use_container_width=True)
 
 except Exception as e:
     st.error(f"데이터를 처리하는 중 오류가 발생했습니다: {e}")
-    st.info("csv 파일의 컬럼명이나 데이터 형식을 다시 한번 확인해 주세요.")
