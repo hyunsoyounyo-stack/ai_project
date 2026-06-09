@@ -1,21 +1,19 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.graph_objects as go
 
 # 1. 페이지 설정 및 제목
 st.set_page_config(page_title="서울시 연령별 미디어 사용량 분석", layout="wide")
 st.title("📊 2013년 서울시 연령별 스마트폰/미디어 사용량 분석")
-st.markdown("업로드된 `aa.csv` 데이터를 바탕으로 연령대별 사용 빈도와 평균 사용 시간을 분석합니다.")
+st.markdown("업로드된 `aa.csv` 데이터를 바탕으로 연령대별 사용 빈도와 나의 정확한 상위 위치(%)를 분석합니다.")
 
-# 2. 데이터 로드 함수 (인코딩 추가 및 캐싱 처리)
+# 2. 데이터 로드 함수 (인코딩 처리 및 캐싱)
 @st.cache_data
 def load_data():
-    # 파일이 EUC-KR / CP949로 인코딩되어 있어 encoding='cp949' 추가
     df = pd.read_csv("aa.csv", skiprows=2, header=None, encoding='cp949')
     df.columns = ["구분별(1)", "구분별(2)", "1일평균사용시간", "1시간이하", "1-3시간", "3-5시간", "5시간초과"]
     
-    # 공백이나 노이즈 제거를 위한 strip() 처리
+    # 공백 제거
     df["구분별(1)"] = df["구분별(1)"].str.strip()
     df["구분별(2)"] = df["구분별(2)"].str.strip()
     
@@ -33,67 +31,110 @@ try:
     df_age = load_data()
 
     # 화면을 두 개의 구역(Column)으로 분할
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([1.8, 1.2])
 
     with col1:
         st.subheader("🎵 연령대별 사용 빈도 (구간별 비율)")
         
-        # 시각화를 위해 데이터 재구조화 (Melt)
-        melted_df = df_age.melt(
-            id_vars=["구분별(2)"], 
-            value_vars=["1시간이하", "1-3시간", "3-5시간", "5시간초과"],
-            var_name="사용시간_구간", 
-            value_name="비율"
+        # 💡 스트림릿 클라우드 한글 깨짐 방지를 위해 Plotly 기반 막대그래프 구현
+        categories = ["1시간이하", "1-3시간", "3-5시간", "5시간초과"]
+        
+        # 라일락 계열 색상 지정
+        colors = ["#DCD0FF", "#C8A2C8", "#B19CD9", "#9370DB"]
+        
+        fig = go.Figure()
+        for cat, color in zip(categories, colors):
+            fig.add_trace(go.Bar(
+                name=cat,
+                x=df_age["구분별(2)"],
+                y=df_age[cat],
+                marker_color=color
+            ))
+            
+        fig.update_layout(
+            title="연령대별 사용 시간대 분포 (%)",
+            xaxis_title="연령대",
+            yaxis_title="비율 (%)",
+            barmode='group',
+            legend_title="이용 시간 구간",
+            template="plotly_white",
+            margin=dict(l=40, r=40, t=60, b=40)
         )
         
-        # 💡 중요: 스트림릿 클라우드(리눅스) 환경에서 한글 깨짐 방지 설정
-        plt.rcParams['font.family'] = 'DejaVu Sans'  # 리눅스 기본 영문 폰트 지정
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 그래프 생성 (라일락 색상 반영: #C8A2C8)
-        fig, ax = plt.subplots(figsize=(10, 6))
-        lilac_color = "#C8A2C8"
-        
-        sns.barplot(
-            data=melted_df, 
-            x="구분별(2)", 
-            y="비율", 
-            hue="사용시간_구간", 
-            palette=[lilac_color, "#DCD0FF", "#B19CD9", "#9370DB"], # 라일락 계열 그라데이션
-            ax=ax
-        )
-        
-        # 💡 스트림릿 클라우드에서 한글 깨짐을 막기 위해 그래프 내부 텍스트는 영문으로 매핑하거나, 깔끔하게 지우고 스트림릿 화면으로 보완
-        ax.set_title("Age Groups vs Usage Distribution (%)", fontsize=14, pad=15)
-        ax.set_xlabel("Age Group", fontsize=12)
-        ax.set_ylabel("Ratio (%)", fontsize=12)
-        ax.legend(title="Usage Interval")
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-        
-        st.pyplot(fig)
-        st.caption("※ 스트림릿 클라우드 환경의 폰트 제한으로 인해 그래프 축 이름은 영문으로 표시됩니다.")
+        st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        st.subheader("🔍 연령대별 평균 사용시간 조회")
+        st.subheader("🔍 연령대별 평균 및 나의 위치 측정")
         
-        # 나잇대 선택 셀렉트박스
+        # 1. 나잇대 선택
         age_list = df_age["구분별(2)"].tolist()
-        selected_age = st.selectbox("나잇대를 선택하세요:", age_list)
+        selected_age = st.selectbox("본인의 나잇대를 선택하세요:", age_list)
         
         # 선택된 나이의 데이터 추출
         selected_data = df_age[df_age["구분별(2)"] == selected_age].iloc[0]
         avg_time = selected_data["1일평균사용시간"]
         
-        # 깔끔한 카드 형태로 평균 사용 시간 표시
-        st.info(f"### 🕒 {selected_age} 평균 사용 시간")
-        st.metric(label="하루 평균", value=f"{avg_time} 시간")
+        # 평균 사용 시간 표시
+        st.info(f"### 🕒 {selected_age} 평균 사용 시간: **{avg_time} 시간**")
         
-        # 추가 세부 지표 표시
-        st.write(f"**{selected_age}의 상세 분포:**")
-        st.write(f"- 1시간 이하: {selected_data['1시간이하']}%")
-        st.write(f"- 1~3 시간: {selected_data['1-3시간']}%")
-        st.write(f"- 3~5 시간: {selected_data['3-5시간']}%")
-        st.write(f"- 5시간 초과: {selected_data['5시간초과']}%")
+        st.write("---")
+        
+        # 2. 본인 사용 시간 입력 및 정밀 % 계산
+        st.markdown("#### 💡 나의 정확한 상위 퍼센트(%) 계산")
+        my_time = st.number_input(
+            "하루 평균 스마트폰 사용 시간(시간 단위)을 입력하세요:", 
+            min_value=0.0, max_value=24.0, value=2.0, step=0.1
+        )
+        
+        p_under_1 = selected_data["1시간이하"]
+        p_1_to_3 = selected_data["1-3시간"]
+        p_3_to_5 = selected_data["3-5시간"]
+        p_over_5 = selected_data["5시간초과"]
+        
+        # 💡 선형 보간법을 적용한 정밀 상위 % 계산 로직
+        if my_time > 5.0:
+            # 5시간을 초과하는 경우, 최대 10시간을 기준으로 비례 계산 (임의 기준선 제공)
+            clamped_time = min(my_time, 10.0)
+            ratio = (clamped_time - 5.0) / 5.0
+            estimated_top = p_over_5 * (1.0 - ratio)
+            # 최소값은 상위 0.1%로 제한
+            estimated_top = max(estimated_top, 0.1)
+            
+        elif 3.0 <= my_time <= 5.0:
+            # 3~5시간 구간 사이의 위치 계산
+            ratio = (my_time - 3.0) / (5.0 - 3.0)
+            estimated_top = p_over_5 + (p_3_to_5 * (1.0 - ratio))
+            
+        elif 1.0 <= my_time < 3.0:
+            # 1~3시간 구간 사이의 위치 계산
+            ratio = (my_time - 1.0) / (3.0 - 1.0)
+            estimated_top = p_over_5 + p_3_to_5 + (p_1_to_3 * (1.0 - ratio))
+            
+        else:
+            # 0~1시간 구간 사이의 위치 계산
+            ratio = my_time / 1.0
+            estimated_top = p_over_5 + p_3_to_5 + p_1_to_3 + (p_under_1 * (1.0 - ratio))
+            # 최대값은 100%로 제한
+            estimated_top = min(estimated_top, 100.0)
+
+        # 결과 출력 구조화
+        st.markdown(f"**[정밀 분석 결과]**")
+        
+        if estimated_top <= 10.0:
+            st.error(f"선택하신 **{selected_age} 중 상위 약 {estimated_top:.1f}%**에 해당합니다! 대단한 헤비유저이시네요. 🚀")
+        elif 10.0 < estimated_top <= 40.0:
+            st.warning(f"선택하신 **{selected_age} 중 상위 약 {estimated_top:.1f}%**에 해당합니다. 평균보다 다소 많이 사용하는 편입니다. 👍")
+        elif 40.0 < estimated_top <= 80.0:
+            st.success(f"선택하신 **{selected_age} 중 상위 약 {estimated_top:.1f}%**에 해당합니다. 평균 범주에 속하는 안정적인 이용 상태입니다. ☕")
+        else:
+            st.success(f"선택하신 **{selected_age} 중 상위 약 {estimated_top:.1f}%**에 해당합니다. 미디어 기기를 거의 사용하지 않는 청정 구역에 계십니다! 🌳")
+
+        # 세부 지표 확인
+        with st.expander(f"📊 {selected_age} 분포 요약 데이터"):
+            st.write(f"- 5시간 초과: {p_over_5}%")
+            st.write(f"- 3~5시간: {p_3_to_5}%")
+            st.write(f"- 1~3시간: {p_1_to_3}%")
+            st.write(f"- 1시간 이하: {p_under_1}%")
 
 except FileNotFoundError:
     st.error("📂 `aa.csv` 파일을 찾을 수 없습니다. GitHub 저장소에 코드가 있는 위치와 같은 곳에 데이터를 업로드해 주세요.")
